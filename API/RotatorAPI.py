@@ -8,18 +8,21 @@ winter.maximilian (at) physik.lmu.de
 Simple API for the Thorlabs ELL14 Elliptec rotation stage.
 """
 import serial
-import time
 import struct
 
 class RotatorDevice():
     
-    default_commands = {'info'              : ('in', 0, 'IN', 30),
-                        'get_position'      : ('gp', 0, 'PO', 8),
+    # dict, of all available commands, structured as {key: ('command', n_write, 'reply', n_read)},
+    # where n_write is the number of bytes to be written, and n_read the number of bytes to be read
+    # with the respective command
+    # all possible commands are listed in https://www.thorlabs.com/Software/Elliptec/Communications_Protocol/ELLx%20modules%20protocol%20manual.pdf
+    
+    default_commands = {'get_position'      : ('gp', 0, 'PO', 8),
                         'get_home_offset'   : ('go', 0, 'HO', 8),
                         'get_jogstep_size'  : ('gj', 0, 'GJ', 8),
                         
-                        'move_to_home_cw'   : ('ho0', 0, 'PO', 8),
-                        'move_to_home_ccw'  : ('ho1', 0, 'PO', 8),
+                        'move_to_home_cw'   : ('ho0', 0, 'PO', 8), # clockwise
+                        'move_to_home_ccw'  : ('ho1', 0, 'PO', 8), # counter clockwise
                         'move_absolute'     : ('ma', 8, 'PO', 8),
                         'move_relative'     : ('mr', 8, 'PO', 8),
                         'move_forward'      : ('fw', 0, 'PO', 8),
@@ -43,11 +46,6 @@ class RotatorDevice():
         
         self.commands = commands
         
-        self.ser.flushInput()
-        self.ser.write(bytes(self.address + 'in', 'ascii'))
-        time.sleep(0.1)
-        self.device_info = self.ser.readline()
-        
         self.rev_in_pulses = rev_in_pulses
         
     def write(self, key,  val_deg = None, read=True):
@@ -55,6 +53,8 @@ class RotatorDevice():
         key: string, one of the available keys in the commands dict
         
         val_deg: float, int or None, value in degrees
+        
+        read: bool, if set to True the device's reply is awaited and returned (together with the command string)
         
         returns: tuple of bytes (command string), int (reply in pulses), float (reply in deg) or None
         
@@ -121,14 +121,13 @@ class RotatorAPI():
     
     def __init__(self, port='COM3', n_devices=1):
         
-        self.ser = serial.Serial('COM3', baudrate=9600, timeout=2)
+        self.ser = serial.Serial(port, baudrate=9600, timeout=2)
         
         self.dev = {}
         
         for i in range(n_devices):
             self.dev[i] = RotatorDevice(self.ser, address=i)
             
-        #locals().update(self.devices)
     def __del__(self):
         self.ser.close()
         
